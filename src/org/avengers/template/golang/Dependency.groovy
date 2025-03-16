@@ -20,8 +20,17 @@ class Dependency implements Serializable {
                     branches: [[name: branch]],
                     userRemoteConfigs: [[url: repoUrl, credentialsId: credentialsId]]
                 ])
+                
             }
-            
+            script.stage('Setup Environment') {
+    script.echo "Setting up Java version: ${javaVersion}"
+    // Add Go environment setup
+    script.sh '''
+        export GOPATH=$HOME/go
+        export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+        go version
+    '''
+}
             script.stage('Setup Environment') {
                 script.echo "Setting up Java version: ${javaVersion}"
                 // Add Java setup commands if needed
