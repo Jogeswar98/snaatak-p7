@@ -1,4 +1,4 @@
-package org.avengers.template.golang
+package org.avengers.template.golang  // Consider renaming to a more generic package if supporting both Go and Java
 
 class Dependency implements Serializable {
     def steps
@@ -8,47 +8,39 @@ class Dependency implements Serializable {
     }
 
     def call(String repoUrl, String credentialsId, String branch, String depVersion, String javaVersion) {
-        // Get access to the Jenkins steps
         def script = steps ?: this
 
-        // We need to run this in a node context
         script.node {
-            // Now we can use the stage method through the script variable
             script.stage('Checkout') {
                 script.checkout([
                     $class: 'GitSCM',
                     branches: [[name: branch]],
                     userRemoteConfigs: [[url: repoUrl, credentialsId: credentialsId]]
                 ])
-                
             }
-            script.stage('Setup Environment') {
-    script.echo "Setting up Java version: ${javaVersion}"
-    // Add Go environment setup
-    script.sh '''
-        export GOPATH=$HOME/go
-        export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
-        go version
-    '''
-}
+            
             script.stage('Setup Environment') {
                 script.echo "Setting up Java version: ${javaVersion}"
-                // Add Java setup commands if needed
+                script.sh "export JAVA_HOME=/usr/lib/jvm/java-${javaVersion}-openjdk-amd64"
+                script.sh "java -version"
             }
             
             script.stage('Check Dependencies') {
                 script.echo "Checking dependencies for version: ${depVersion}"
-                // Implement dependency check logic for Go projects
-                script.sh 'go mod tidy || echo "Go mod tidy failed but continuing"'
-                script.sh 'go list -m all || echo "Go list failed but continuing"'
+                script.sh 'mvn clean install -DskipTests'
             }
             
-            script.stage('Build') {
-                script.sh 'go build -v ./... || echo "Build failed but continuing"'
+            script.stage('Run SpotBugs Analysis') {
+                script.echo "Running SpotBugs Analysis..."
+                script.sh '''
+                    mvn spotbugs:check || true
+                    mvn spotbugs:gui || true
+                '''
+                script.archiveArtifacts artifacts: 'target/spotbugsXml.xml, target/spotbugs.html', allowEmptyArchive: true
             }
             
-            script.stage('Test') {
-                script.sh 'go test ./... || echo "Tests failed but continuing"'
+            script.stage('Run Tests') {
+                script.sh 'mvn test || echo "Tests failed but continuing"'
             }
         }
     }
